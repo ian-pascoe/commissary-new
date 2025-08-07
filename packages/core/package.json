@@ -1,0 +1,9 @@
+{
+  "name": "@commissary/core",
+  "type": "module",
+  "private": true,
+  "scripts": {},
+  "dependencies": {
+    "@paralleldrive/cuid2": "^2.2.2"
+  }
+}
