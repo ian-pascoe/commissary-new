@@ -35,3 +35,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Alchemy.run
 .alchemy
+
+# TurboRepo
+.turbo
+
+# Better-Auth
+auth-schema.ts

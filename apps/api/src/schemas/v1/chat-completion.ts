@@ -1,24 +1,24 @@
 import * as z from 'zod';
 
-export const ChatCompletionSystemMessage = z.object({
+export const ChatCompletionV1SystemMessage = z.object({
   role: z.literal('system'),
   content: z.string(),
   name: z.optional(z.string()),
 });
-export type ChatCompletionSystemMessage = z.infer<
-  typeof ChatCompletionSystemMessage
+export type ChatCompletionV1SystemMessage = z.infer<
+  typeof ChatCompletionV1SystemMessage
 >;
 
-export const ChatCompletionDeveloperMessage = z.object({
+export const ChatCompletionV1DeveloperMessage = z.object({
   role: z.literal('developer'),
   content: z.string(),
   name: z.optional(z.string()),
 });
-export type ChatCompletionDeveloperMessage = z.infer<
-  typeof ChatCompletionDeveloperMessage
+export type ChatCompletionV1DeveloperMessage = z.infer<
+  typeof ChatCompletionV1DeveloperMessage
 >;
 
-export const ChatCompletionUserMessage = z.object({
+export const ChatCompletionV1UserMessage = z.object({
   role: z.literal('user'),
   content: z.union([
     z.string(),
@@ -55,11 +55,11 @@ export const ChatCompletionUserMessage = z.object({
   ]),
   name: z.optional(z.string()),
 });
-export type ChatCompletionUserMessage = z.infer<
-  typeof ChatCompletionUserMessage
+export type ChatCompletionV1UserMessage = z.infer<
+  typeof ChatCompletionV1UserMessage
 >;
 
-export const ChatCompletionAssistantMessage = z.object({
+export const ChatCompletionV1AssistantMessage = z.object({
   role: z.literal('assistant'),
   audio: z.optional(
     z.object({
@@ -104,11 +104,11 @@ export const ChatCompletionAssistantMessage = z.object({
     ),
   ),
 });
-export type ChatCompletionAssistantMessage = z.infer<
-  typeof ChatCompletionAssistantMessage
+export type ChatCompletionV1AssistantMessage = z.infer<
+  typeof ChatCompletionV1AssistantMessage
 >;
 
-export const ChatCompletionToolMessage = z.object({
+export const ChatCompletionV1ToolMessage = z.object({
   role: z.literal('tool'),
   content: z.union([
     z.string(),
@@ -121,36 +121,36 @@ export const ChatCompletionToolMessage = z.object({
   ]),
   tool_call_id: z.string(),
 });
-export type ChatCompletionToolMessage = z.infer<
-  typeof ChatCompletionToolMessage
+export type ChatCompletionV1ToolMessage = z.infer<
+  typeof ChatCompletionV1ToolMessage
 >;
 
-export const ChatCompletionFunctionMessage = z
+export const ChatCompletionV1FunctionMessage = z
   .object({
     role: z.literal('function'),
     name: z.string(),
     content: z.nullable(z.string()),
   })
   .meta({ deprecated: true });
-export type ChatCompletionFunctionMessage = z.infer<
-  typeof ChatCompletionFunctionMessage
+export type ChatCompletionV1FunctionMessage = z.infer<
+  typeof ChatCompletionV1FunctionMessage
 >;
 
-export const ChatCompletionMessage = z.union([
-  ChatCompletionSystemMessage,
-  ChatCompletionDeveloperMessage,
-  ChatCompletionUserMessage,
-  ChatCompletionAssistantMessage,
-  ChatCompletionToolMessage,
-  ChatCompletionFunctionMessage,
+export const ChatCompletionV1Message = z.union([
+  ChatCompletionV1SystemMessage,
+  ChatCompletionV1DeveloperMessage,
+  ChatCompletionV1UserMessage,
+  ChatCompletionV1AssistantMessage,
+  ChatCompletionV1ToolMessage,
+  ChatCompletionV1FunctionMessage,
 ]);
-export type ChatCompletionMessage = z.infer<typeof ChatCompletionMessage>;
+export type ChatCompletionV1Message = z.infer<typeof ChatCompletionV1Message>;
 
-export const ChatCompletionRequestBody = z.object({
+export const ChatCompletionV1RequestBody = z.object({
   model: z.string(),
   stream: z.nullish(z.boolean()),
-  messages: z.array(ChatCompletionMessage),
+  messages: z.array(ChatCompletionV1Message),
 });
-export type ChatCompletionRequestBody = z.infer<
-  typeof ChatCompletionRequestBody
+export type ChatCompletionV1RequestBody = z.infer<
+  typeof ChatCompletionV1RequestBody
 >;

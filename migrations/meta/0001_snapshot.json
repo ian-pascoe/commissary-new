@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1a282535-19f4-44a5-b92f-8c69dd68d285",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "faddaf1c-a6a6-4461-bb8a-11906b0558ca",
+  "prevId": "00ee7dd0-3e1e-40d5-a916-b76a8a176fca",
   "tables": {
     "models": {
       "name": "models",
@@ -70,15 +70,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "context_length": {
-          "name": "context_length",
-          "type": "integer",
+        "tokenizer": {
+          "name": "tokenizer",
+          "type": "text",
           "primaryKey": false,
-          "notNull": false,
+          "notNull": true,
           "autoincrement": false
         },
-        "max_output_tokens": {
-          "name": "max_output_tokens",
+        "context_length": {
+          "name": "context_length",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
@@ -179,6 +179,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "tokenizer": {
+          "name": "tokenizer",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
         "context_length": {
           "name": "context_length",
           "type": "integer",
@@ -200,58 +207,58 @@
           "notNull": false,
           "autoincrement": false
         },
-        "input_price": {
-          "name": "input_price",
-          "type": "integer",
+        "pricing_input": {
+          "name": "pricing_input",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "output_price": {
-          "name": "output_price",
-          "type": "integer",
+        "pricing_output": {
+          "name": "pricing_output",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "image_price": {
-          "name": "image_price",
-          "type": "integer",
+        "pricing_image": {
+          "name": "pricing_image",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "request_price": {
-          "name": "request_price",
-          "type": "integer",
+        "pricing_request": {
+          "name": "pricing_request",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "web_search_price": {
-          "name": "web_search_price",
-          "type": "integer",
+        "pricing_web_search": {
+          "name": "pricing_web_search",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "internal_reasoning_price": {
-          "name": "internal_reasoning_price",
-          "type": "integer",
+        "pricing_internal_reasoning": {
+          "name": "pricing_internal_reasoning",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "input_cache_read_price": {
-          "name": "input_cache_read_price",
-          "type": "integer",
+        "pricing_input_cache_read": {
+          "name": "pricing_input_cache_read",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "input_cache_write_price": {
-          "name": "input_cache_write_price",
-          "type": "integer",
+        "pricing_input_cache_write": {
+          "name": "pricing_input_cache_write",
+          "type": "numeric",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -272,8 +279,8 @@
           ],
           "isUnique": false
         },
-        "provider_models_provider_slug_idx": {
-          "name": "provider_models_provider_slug_idx",
+        "provider_models_provider_id_slug_idx": {
+          "name": "provider_models_provider_id_slug_idx",
           "columns": [
             "provider_id",
             "slug"
@@ -365,13 +372,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "sdk": {
-          "name": "sdk",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "privacy_policy_url": {
           "name": "privacy_policy_url",
           "type": "text",
@@ -408,6 +408,14 @@
           "notNull": false,
           "autoincrement": false,
           "default": false
+        },
+        "is_moderated": {
+          "name": "is_moderated",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {
@@ -422,13 +430,6 @@
           "name": "providers_name_idx",
           "columns": [
             "name"
-          ],
-          "isUnique": false
-        },
-        "providers_sdk_idx": {
-          "name": "providers_sdk_idx",
-          "columns": [
-            "sdk"
           ],
           "isUnique": false
         }

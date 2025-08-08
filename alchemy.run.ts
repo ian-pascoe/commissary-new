@@ -15,7 +15,7 @@ const domain =
       : `${app.stage}.dev.${baseDomain}`;
 
 const db = await D1Database('db', {
-  migrationsDir: 'drizzle',
+  migrationsDir: './migrations',
 });
 
 // API
@@ -25,12 +25,15 @@ const apiUrl = app.local
   ? `http://localhost:${apiDevPort}`
   : `https://${apiDomain}`;
 export const api = await Worker('api', {
-  cwd: 'apps/api',
+  cwd: './apps/api',
   entrypoint: 'src/index.ts',
   compatibilityFlags: ['nodejs_compat'],
   bindings: {
     DB: db,
     API_URL: apiUrl,
+
+    // AI Providers
+    OPENAI_API_KEY: alchemy.secret(process.env.OPENAI_API_KEY),
   },
   domains: [apiDomain],
   dev: {

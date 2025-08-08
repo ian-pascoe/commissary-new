@@ -2,7 +2,9 @@
   "name": "@commissary/core",
   "type": "module",
   "private": true,
-  "scripts": {},
+  "scripts": {
+    "type-check": "tsc"
+  },
   "dependencies": {
     "@paralleldrive/cuid2": "^2.2.2"
   }

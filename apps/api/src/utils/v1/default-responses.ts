@@ -3,7 +3,7 @@ import { resolver } from 'hono-openapi/zod';
 import type { OpenAPIV3 } from 'openapi-types';
 import * as z from 'zod';
 
-export const defaultResponses: {
+export const v1DefaultResponses: {
   [key: string]:
     | OpenAPIV3.ReferenceObject
     | (OpenAPIV3.ResponseObject & {
