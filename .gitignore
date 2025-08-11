@@ -40,4 +40,4 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .turbo
 
 # Better-Auth
-auth-schema.ts
+drizzle/schema/auth.new.ts

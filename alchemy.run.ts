@@ -14,6 +14,7 @@ const domain =
       ? `dev.${baseDomain}`
       : `${app.stage}.dev.${baseDomain}`;
 
+// Database
 const db = await D1Database('db', {
   migrationsDir: './migrations',
 });

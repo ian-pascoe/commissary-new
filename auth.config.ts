@@ -5,6 +5,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, apiKey, bearer, organization } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { Stripe } from 'stripe';
+import * as authSchema from './drizzle/schema/auth';
 
 const adminPlugin = admin();
 const organizationPlugin = organization({
@@ -48,20 +49,25 @@ export const authConfig = {
       generateId: false,
     },
   },
-  plugins: [
-    adminPlugin,
-    organizationPlugin,
-    apiKeyPlugin,
-    bearerPlugin,
-    dummyStripePlugin,
-  ],
 } satisfies BetterAuthOptions;
 
 export const auth = betterAuth({
   ...authConfig,
+  plugins: [...authPlugins, dummyStripePlugin],
   // dummy db and cache for schema generation, will be implemented in the API
   database: drizzleAdapter(drizzle(new Database()), {
-    provider: 'sqlite',
+    provider: 'pg',
+    schema: {
+      users: authSchema.usersTable,
+      accounts: authSchema.accountsTable,
+      verifications: authSchema.verificationsTable,
+      organizations: authSchema.organizationsTable,
+      organizationMembers: authSchema.organizationMembersTable,
+      invitations: authSchema.invitationsTable,
+      teams: authSchema.teamsTable,
+      teamMembers: authSchema.teamMembersTable,
+      apiKeys: authSchema.apiKeysTable,
+    },
   }),
   secondaryStorage: {
     get: () => Promise.resolve(null),
