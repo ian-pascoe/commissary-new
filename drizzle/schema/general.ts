@@ -11,7 +11,6 @@ import {
 import type { Metadata } from '~/core/schemas/metadata';
 import type { Modality } from '~/core/schemas/modality';
 import type { ParameterMapping } from '~/core/schemas/parameter-mapping';
-import type { RoutingCondition } from '~/core/schemas/routing-condition';
 import { apiKeysTable, organizationsTable, teamsTable, usersTable } from './auth';
 import { baseModel } from './utils';
 
@@ -259,7 +258,7 @@ export const routingRulesTable = pgTable(
       .references(() => routingPoliciesTable.id, { onDelete: 'cascade' }),
 
     order: integer('order').notNull(),
-    condition: jsonb('condition').$type<RoutingCondition>(), // JSON match conditions
+    condition: jsonb('condition').$type<any>(), // JSON match conditions
     targetAlias: text('target_alias'), // points to model_aliases.alias
     active: boolean('active').default(true),
   },

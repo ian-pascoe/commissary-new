@@ -1,9 +1,7 @@
-import { Database } from 'bun:sqlite';
 import { stripe } from '@better-auth/stripe';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, apiKey, bearer, type OrganizationOptions, organization } from 'better-auth/plugins';
-import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { Stripe } from 'stripe';
 import * as authSchema from './drizzle/schema/auth';
 
@@ -51,7 +49,7 @@ export const auth = betterAuth({
     }),
   ],
   // dummy db and cache for schema generation, will be implemented in the API
-  database: drizzleAdapter(drizzle(new Database()), {
+  database: drizzleAdapter({} as any, {
     provider: 'pg',
     schema: {
       user: authSchema.usersTable,

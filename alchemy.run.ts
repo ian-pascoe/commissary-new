@@ -24,6 +24,7 @@ let databaseUrl: string;
 if (app.local) {
   await Container('database-container', {
     image: 'postgres:latest',
+    restart: 'always',
     ports: [{ external: 5432, internal: 5432 }],
     environment: {
       POSTGRES_USER: 'postgres',
@@ -60,6 +61,9 @@ if (app.local) {
 
 await Exec('migrations', {
   command: 'bun run db:migrate',
+  env: {
+    DATABASE_URL: databaseUrl,
+  },
   memoize: {
     patterns: ['./drizzle/migrations/*.sql'],
   },
@@ -83,8 +87,9 @@ const apiDomain = `api.${domain}`;
 const apiDevPort = 8787;
 const apiUrl = app.local ? `http://localhost:${apiDevPort}` : `https://${apiDomain}`;
 const stripeWebhookEndpoint = await WebhookEndpoint('stripe-webhook', {
-  url: `${apiUrl}/auth/stripe/webhook`,
+  url: `https://${apiDomain}/stripe/webhook`,
   enabledEvents: ['*'],
+  apiKey: alchemy.secret(process.env.STRIPE_SECRET_KEY),
 });
 export const api = await Worker('api', {
   cwd: './apps/api',
