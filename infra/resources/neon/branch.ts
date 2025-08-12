@@ -12,16 +12,14 @@ import {
 import { type Context, Resource } from 'alchemy';
 import { AxiosError } from 'axios';
 
-export interface BranchProps
-  extends BranchCreateRequest,
-    AnnotationCreateValueRequest {
+export interface NeonBranchProps extends BranchCreateRequest, AnnotationCreateValueRequest {
   projectId: string;
   adopt?: boolean;
 }
 
-export interface Branch
+export interface NeonBranch
   extends Resource<'neon::Branch'>,
-    Omit<BranchProps, 'branch' | 'endpoints'>,
+    Omit<NeonBranchProps, 'branch' | 'endpoints'>,
     BranchResponse,
     EndpointsResponse,
     OperationsResponse,
@@ -29,13 +27,13 @@ export interface Branch
     DatabasesResponse,
     ConnectionURIsOptionalResponse {}
 
-export const Branch = Resource(
+export const NeonBranch = Resource(
   'neon::Branch',
   async function (
-    this: Context<Branch>,
+    this: Context<NeonBranch>,
     _id: string,
-    props: BranchProps,
-  ): Promise<Branch> {
+    props: NeonBranchProps,
+  ): Promise<NeonBranch> {
     if (!process.env.NEON_API_KEY) {
       throw new Error('NEON_API_KEY is not set');
     }
@@ -43,10 +41,7 @@ export const Branch = Resource(
 
     if (this.phase === 'delete') {
       try {
-        await apiClient.deleteProjectBranch(
-          this.output.projectId,
-          this.output.branch.id,
-        );
+        await apiClient.deleteProjectBranch(this.output.projectId, this.output.branch.id);
         return this.destroy();
       } catch (e) {
         throw new Error('Failed to delete project branch', { cause: e });

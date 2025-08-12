@@ -2,41 +2,27 @@ import { Database } from 'bun:sqlite';
 import { stripe } from '@better-auth/stripe';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { admin, apiKey, bearer, organization } from 'better-auth/plugins';
+import { admin, apiKey, bearer, type OrganizationOptions, organization } from 'better-auth/plugins';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { Stripe } from 'stripe';
 import * as authSchema from './drizzle/schema/auth';
 
-const adminPlugin = admin();
-const organizationPlugin = organization({
+export const organizationPluginConfig = {
   teams: { enabled: true },
   schema: {
     organization: { modelName: 'organizationsTable' },
     member: { modelName: 'organizationMembersTable' },
-    invitation: { modelName: 'invitationsTable' },
+    invitation: { modelName: 'organizationInvitationsTable' },
     team: { modelName: 'teamsTable' },
     teamMember: { modelName: 'teamMembersTable' },
   },
-});
-const apiKeyPlugin = apiKey({
+} satisfies OrganizationOptions;
+
+export const apiKeyPluginConfig = {
   schema: {
     apikey: { modelName: 'apiKeysTable' },
   },
-});
-const bearerPlugin = bearer();
-
-export const authPlugins = [
-  adminPlugin,
-  organizationPlugin,
-  apiKeyPlugin,
-  bearerPlugin,
-];
-
-const dummyStripePlugin = stripe({
-  stripeClient: new Stripe('dummy'),
-  stripeWebhookSecret: 'dummy',
-  createCustomerOnSignUp: true,
-});
+} satisfies Parameters<typeof apiKey>[0];
 
 export const authConfig = {
   appName: 'Commissary',
@@ -53,20 +39,30 @@ export const authConfig = {
 
 export const auth = betterAuth({
   ...authConfig,
-  plugins: [...authPlugins, dummyStripePlugin],
+  plugins: [
+    admin(),
+    organization(organizationPluginConfig),
+    apiKey(apiKeyPluginConfig),
+    bearer(),
+    stripe({
+      stripeClient: new Stripe('dummy'),
+      stripeWebhookSecret: 'dummy',
+      createCustomerOnSignUp: true,
+    }),
+  ],
   // dummy db and cache for schema generation, will be implemented in the API
   database: drizzleAdapter(drizzle(new Database()), {
     provider: 'pg',
     schema: {
-      users: authSchema.usersTable,
-      accounts: authSchema.accountsTable,
-      verifications: authSchema.verificationsTable,
-      organizations: authSchema.organizationsTable,
-      organizationMembers: authSchema.organizationMembersTable,
-      invitations: authSchema.invitationsTable,
-      teams: authSchema.teamsTable,
-      teamMembers: authSchema.teamMembersTable,
-      apiKeys: authSchema.apiKeysTable,
+      user: authSchema.usersTable,
+      account: authSchema.accountsTable,
+      verification: authSchema.verificationsTable,
+      organization: authSchema.organizationsTable,
+      member: authSchema.organizationMembersTable,
+      invitation: authSchema.organizationInvitationsTable,
+      team: authSchema.teamsTable,
+      teamMember: authSchema.teamMembersTable,
+      apiKey: authSchema.apiKeysTable,
     },
   }),
   secondaryStorage: {

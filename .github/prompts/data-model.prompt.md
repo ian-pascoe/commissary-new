@@ -34,9 +34,9 @@ Routing configuration and policies
 - transform_policies: pre/post processors (prompt templating, system prepend, JSON schema enforcement)
 
 Access, keys, and restrictions
-- api_keys: use Better-Auth apiKeysTable as source of truth; link keys to teams and environments via a companion api_key_bindings table (apiKeyId → teamId, environmentId). Fields: name, hashedKey/lastFour, scopes (chat, embeddings, images, admin), enabled, expiresAt, metadata (do not modify auth table columns).
-- key_restrictions: companion table keyed by apiKeyId (FK to apiKeysTable.id) with ipAllowlist, ipBlocklist, origin/referrer allowlist, path scope, QPS/QPM caps, model allow/deny, region allow/deny.
-- key_events: issuance, rotation, revocation, lastUsedAt
+- api_keys: use Better-Auth apiKeysTable as source of truth; link keys to teams and environments via a companion api_key_bindings table (apiKeyId → teamId, environmentId). Store restrictions and configuration in the existing metadata column as structured JSON. Fields: name, hashedKey/lastFour, scopes (chat, embeddings, images, admin), enabled, expiresAt, metadata (do not modify auth table columns).
+- key restrictions: stored in apiKeysTable.metadata as structured JSON with ipAllowlist, ipBlocklist, origin/referrer allowlist, path scope, QPS/QPM caps, model allow/deny, region allow/deny, time windows.
+- key events: lifecycle events (issuance, rotation, revocation, lastUsedAt) stored in audit_logs table or as events array in metadata
 
 Traffic, messages, and traces
 - requests: immutable ingress record; idempotencyKey, teamId/envId, apiKeyId, userId (if JWT), request type (chat, completions, embeddings), inputSize, requestedModel, routingDecisionId, latencyMs, status, errorClass, metadata
@@ -81,7 +81,6 @@ Audit and admin
 - audit_logs: actor (user/key), action, target, before/after, ip, userAgent, reason
 - admin_overrides: emergency flags to disable providers/models/regions; reason + expiresAt
 
-- organization 1—* teams; team 1—* environments
 - environment 1—* api_key_bindings (→ apiKeysTable), provider_credentials, routing_policies, quotas
 - provider 1—* provider_models; model 1—* provider_models; provider_model 1—* price_book
 - team/env — model_aliases → provider_models
@@ -89,16 +88,18 @@ Audit and admin
 - request 1—* messages, streaming_events, tool_calls; request 1—1 response; response 1—* usage_events
 - ab_tests 1—* ab_assignments; requests reference ab_assignmentId for attribution
 - webhook_endpoints 1—* webhook_deliveries
+- apiKeysTable.metadata contains structured restrictions and configuration data
 
 Indexing and performance
 - High-cardinality: requests(id, createdAt DESC), usage_events(time DESC, teamId, envId, modelAlias, providerModelId)
 - Routing: routing_rules(teamId, envId, active), routing_targets(ruleId, weight)
-- Keys: api_keys(key lookup via prefix/start) with companion api_key_bindings(teamId, environmentId), key_restrictions(apiKeyId), key_events(apiKeyId, createdAt DESC)
+- Keys: api_keys(key lookup via prefix/start) with companion api_key_bindings(teamId, environmentId). Use GIN indexes on metadata JSONB for restriction lookups: api_keys USING gin ((metadata->'restrictions'))
 - Quotas/ratelimits: quotas(teamId, envId), ratelimit_buckets(scope, windowStart)
 - Analytics: provider_metrics(day, providerModelId), spend_aggregates(day, teamId, envId)
 
 Soft deletion and retention
 - Soft-delete keys, templates, credentials; hard-delete streaming_events after retention window
+- Key lifecycle events stored in audit_logs or metadata.events array rather than separate key_events table
 - Partition/time-series tables for requests, streaming_events, usage_events where viable; consider monthly partitions
 
 Schema placement (Drizzle + Zod)
@@ -125,7 +126,7 @@ Observability and UX uplift vs OpenRouter
 - Provider health metrics feed routing; automatic degrade to cheaper/faster depending on policy
 
 Migration and rollout
-- Phase 1 (MVP parity): providers, models, provider_models, price_book, teams/env/key bindings, requests/responses/messages, usage_events, quotas, basic routing_rules/targets, webhooks, audit_logs
+- Phase 1 (MVP parity): providers, models, provider_models, price_book, teams/env/key bindings, requests/responses/messages, usage_events, quotas, basic routing_rules/targets, webhooks, audit_logs. API key restrictions stored in metadata column.
 - Phase 2 (UX+): prompt_templates/versions/runs, prompt_cache, feedback, tags, analytics rollups, provider_metrics
 - Phase 3 (advanced): ab_tests/assignments, fine-tunes, datasets/files, embedding_jobs, safety/transform policies, streaming_events detail
 
@@ -140,13 +141,13 @@ Security and privacy
 - IP/origin allowlist enforcement at ingress; signed webhook verification
 
 Deliverables
-- Drizzle schemas for Phase 1 domain tables (including api_key_bindings, key_restrictions, environments, routing, requests/usage)
-- Zod schemas via drizzle-zod
+- Drizzle schemas for Phase 1 domain tables (including api_key_bindings, environments, routing, requests/usage)
+- Zod schemas via drizzle-zod for database models and metadata structure validation (api key restrictions, routing policies, etc.)
 - Seed scripts for providers/models/price_book
 - Migrations generated by drizzle and not hand-edited
 
 Acceptance criteria
 - Can register provider credentials and route traffic via policy/alias scoped to team/env
-- Can bind existing apiKeysTable keys to teams/environments and enforce restrictions; rate limit and quota enforced
+- Can bind existing apiKeysTable keys to teams/environments and enforce restrictions via metadata; rate limit and quota enforced
 - Requests/responses logged with usage cost computed from price_book; usage aggregated by team/env
 - Webhooks dispatched; analytics dashboards backed by aggregates by team/env
