@@ -110,13 +110,14 @@ export const providerModelsTable = pgTable(
       .references(() => modelsTable.id, { onDelete: 'cascade' }),
 
     slug: text('slug').notNull(), // provider-specific model identifier
-    endpointPath: text('endpoint_path'),
+    endpointPath: text('endpoint_path').notNull(),
+    apiSpec: text('api_spec', { enum: ['openai', 'anthropic', 'google', 'unknown'] }).notNull(),
     inputModalities: jsonb('input_modalities').$type<Modality[]>(),
     outputModalities: jsonb('output_modalities').$type<Modality[]>(),
     maxOutputTokens: integer('max_output_tokens'),
     tokenizer: text('tokenizer'),
     quantization: text('quantization', {
-      enum: ['fp8', 'int8', 'int32', 'int64'],
+      enum: ['int4', 'int8', 'fp4', 'fp6', 'fp8', 'fp16', 'bf16', 'fp32', 'unknown'],
     }),
     dimensions: integer('dimensions'), // For embedding models
     parameterMapping: jsonb('parameter_mapping').$type<ParameterMapping>(), // Mapping their supported parameters to ours
