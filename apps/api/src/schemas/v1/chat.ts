@@ -146,6 +146,7 @@ export const ChatCompletionsV1RequestBody = z.object({
   presencePenalty: z.nullish(z.number()),
   repetitionPenalty: z.nullish(z.number()),
   stop: z.nullish(z.array(z.string())),
+  user: z.nullish(z.string()),
 });
 export type ChatCompletionsV1RequestBody = z.infer<typeof ChatCompletionsV1RequestBody>;
 
@@ -202,6 +203,15 @@ export const ChatCompletionsV1Usage = z.object({
 });
 export type ChatCompletionsV1Usage = z.infer<typeof ChatCompletionsV1Usage>;
 
+export const ChatCompletionsV1StopReason = z.enum([
+  'stop',
+  'tool_calls',
+  'length',
+  'function_call',
+  'content_filter',
+]);
+export type ChatCompletionsV1StopReason = z.infer<typeof ChatCompletionsV1StopReason>;
+
 export const ChatCompletionsV1StreamingResponseBody = z.object({
   id: z.string(),
   object: z.literal('chat.completion.chunk'),
@@ -237,7 +247,7 @@ export const ChatCompletionsV1StreamingResponseBody = z.object({
           ),
         ),
       }),
-      finish_reason: z.nullish(z.string()),
+      finish_reason: z.nullish(ChatCompletionsV1StopReason),
       index: z.int(),
       logprobs: z.nullish(ChatCompletionsV1Logprobs),
     }),

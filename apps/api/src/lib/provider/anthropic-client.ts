@@ -1,48 +1,49 @@
 import type {
+  ContentBlock,
   ContentBlockParam,
   MessageCreateParams,
   MessageParam,
-  TextBlockParam,
   RawMessageStreamEvent,
-  ContentBlock,
+  StopReason,
+  TextBlockParam,
 } from '@anthropic-ai/sdk/resources';
-import {
-  ChatCompletionsV1NonStreamingResponseBody,
-  type ChatCompletionsV1Message,
-  type ChatCompletionsV1RequestBody,
-  type ChatCompletionsV1StreamingResponseBody,
+import type {
+  ChatCompletionsV1Message,
+  ChatCompletionsV1RequestBody,
+  ChatCompletionsV1StopReason,
+  ChatCompletionsV1StreamingResponseBody,
+  ChatCompletionsV1Usage,
 } from '~/api/schemas/v1/chat';
-import type { Provider, ProviderCredential, ProviderModel } from '~/core/schemas/database';
 import { createId } from '~/core/utils/id';
 import type { ProviderBaseClient } from './base-client';
-import { ca } from 'zod/v4/locales';
 
 export class AnthropicClient implements ProviderBaseClient {
-  private provider: Provider;
-  private credential: ProviderCredential;
+  provider;
+  credential;
+  model;
 
   constructor(options: {
-    provider: Provider;
-    credential: ProviderCredential;
+    provider: ProviderBaseClient['provider'];
+    credential: ProviderBaseClient['credential'];
+    model: ProviderBaseClient['model'];
   }) {
     this.provider = options.provider;
     this.credential = options.credential;
+    this.model = options.model;
   }
 
   async doGenerate(input: {
-    model: ProviderModel;
     request: ChatCompletionsV1RequestBody;
   }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
     throw new Error('Method not implemented.');
   }
 
   async doStream(input: {
-    model: ProviderModel;
     request: ChatCompletionsV1RequestBody;
   }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
     const { system, messages } = this.convertMessages(input.request.messages);
     const anthropicRequest: MessageCreateParams = {
-      model: input.model.slug,
+      model: this.model.slug,
       max_tokens: input.request.maxOutputTokens ?? 4096,
       temperature: input.request.temperature ?? undefined,
       top_k: input.request.topK ?? undefined,
@@ -53,7 +54,7 @@ export class AnthropicClient implements ProviderBaseClient {
       messages,
     };
 
-    const response = await fetch(`${this.provider.baseUrl}${input.model.endpointPath}`, {
+    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
       method: 'POST',
       body: JSON.stringify(anthropicRequest),
       headers: {
@@ -61,17 +62,31 @@ export class AnthropicClient implements ProviderBaseClient {
         Authorization: `Bearer ${this.credential.value}`,
       },
     });
+    if (!response.ok) {
+      throw new Error(`Anthropic API request failed with status ${response.status}`);
+    }
 
     const reader = response.body?.getReader();
+    const convertToOpenAIFormat = this.convertToOpenAIFormat.bind(this);
     const stream = new ReadableStream<RawMessageStreamEvent>({
       async pull(controller) {
-        while (true) {
-          const { done, value } = (await reader?.read()) ?? {};
-          if (done) {
-            controller.close();
-            break;
+        if (!reader) {
+          controller.close();
+          return;
+        }
+        try {
+          while (true) {
+            const { done, value } = (await reader?.read()) ?? {};
+            if (done) {
+              controller.close();
+              break;
+            }
+            controller.enqueue(value);
           }
-          controller.enqueue(value);
+        } catch (error) {
+          controller.error(error);
+        } finally {
+          reader.releaseLock();
         }
       },
     }).pipeThrough(
@@ -79,14 +94,16 @@ export class AnthropicClient implements ProviderBaseClient {
         async transform(chunk, controller) {
           // Convert chunk to OpenAI format
           const openAIChunk = convertToOpenAIFormat(chunk);
-          controller.enqueue(openAIChunk);
+          if (openAIChunk) {
+            controller.enqueue(openAIChunk);
+          }
         },
       }),
     );
     return { stream };
   }
 
-  convertMessages(messages: ChatCompletionsV1Message[]): {
+  private convertMessages(messages: ChatCompletionsV1Message[]): {
     system: TextBlockParam[];
     messages: MessageParam[];
   } {
@@ -103,52 +120,47 @@ export class AnthropicClient implements ProviderBaseClient {
           content:
             typeof message.content === 'string'
               ? message.content
-              : (message.content
-                  ?.map((c): ContentBlockParam | null => {
-                    switch (c.type) {
-                      case 'text': {
-                        return {
-                          type: 'text',
-                          text: c.text,
-                        };
-                      }
-                      case 'file': {
-                        return {
-                          type: 'document',
-                          source: {
-                            type: 'base64',
-                            media_type: 'application/pdf',
-                            data: c.file.file_data ?? '',
-                          },
-                        };
-                      }
-                      case 'image_url': {
-                        return {
-                          type: 'image',
-                          source: {
-                            type: 'url',
-                            url: c.image_url.url,
-                          },
-                        };
-                      }
-                      case 'input_audio': {
-                        console.warn(
-                          'Anthropic API does not support audio input natively. Audio input will be ignored.',
-                        );
-                        return null;
-                      }
-                      case 'refusal': {
-                        return {
-                          type: 'text',
-                          text: c.refusal,
-                        };
-                      }
-                      default: {
-                        throw new Error(`Unsupported content block type: ${(c as any).type}`);
-                      }
+              : (message.content?.map((c): ContentBlockParam => {
+                  switch (c.type) {
+                    case 'text': {
+                      return {
+                        type: 'text',
+                        text: c.text,
+                      };
                     }
-                  })
-                  .filter((c) => c !== null) ?? []),
+                    case 'file': {
+                      return {
+                        type: 'document',
+                        source: {
+                          type: 'base64',
+                          media_type: 'application/pdf',
+                          data: c.file.file_data ?? '',
+                        },
+                      };
+                    }
+                    case 'image_url': {
+                      return {
+                        type: 'image',
+                        source: {
+                          type: 'url',
+                          url: c.image_url.url,
+                        },
+                      };
+                    }
+                    case 'input_audio': {
+                      throw new Error('Anthropic does not support audio messages');
+                    }
+                    case 'refusal': {
+                      return {
+                        type: 'text',
+                        text: c.refusal,
+                      };
+                    }
+                    default: {
+                      throw new Error(`Unsupported content block type: ${(c as any).type}`);
+                    }
+                  }
+                }) ?? []),
         });
       } else if (message.role === 'tool') {
         anthropicMessages.push({
@@ -189,24 +201,24 @@ export class AnthropicClient implements ProviderBaseClient {
     return { system, messages: anthropicMessages };
   }
 
-  convertToOpenAIFormat(
-    model: ProviderModel,
+  private convertToOpenAIFormat(
     chunk: RawMessageStreamEvent,
   ): ChatCompletionsV1StreamingResponseBody | null {
     const defaultMessageProps = {
-      id: createId(),
+      id: createId('cmpl'),
       object: 'chat.completion.chunk',
       created: Date.now() / 1000,
-      model: model.slug,
+      model: this.model.slug,
     } as const satisfies Partial<ChatCompletionsV1StreamingResponseBody>;
-    let usage: Partial<ChatCompletionsV1StreamingResponseBody['usage']> = {};
+    let usage: Partial<ChatCompletionsV1Usage> = {};
     const contentBlocks: ContentBlock[] = [];
     switch (chunk.type) {
       case 'message_start': {
         usage = {
           ...usage,
           prompt_tokens: chunk.message.usage.input_tokens,
-          
+          completion_tokens: chunk.message.usage.output_tokens,
+          total_tokens: chunk.message.usage.input_tokens + chunk.message.usage.output_tokens,
         };
         return {
           ...defaultMessageProps,
@@ -218,6 +230,28 @@ export class AnthropicClient implements ProviderBaseClient {
             },
           ],
         };
+      }
+      case 'message_delta': {
+        usage = {
+          ...usage,
+          ...(chunk.usage.input_tokens ? { prompt_tokens: chunk.usage.input_tokens } : {}),
+          completion_tokens: chunk.usage.output_tokens,
+          total_tokens:
+            (chunk.usage.input_tokens ?? usage.prompt_tokens ?? 0) + chunk.usage.output_tokens,
+        };
+        if (chunk.delta.stop_reason) {
+          return {
+            ...defaultMessageProps,
+            choices: [
+              {
+                index: 0,
+                delta: {},
+                finish_reason: this.mapStopReason(chunk.delta.stop_reason),
+              },
+            ],
+          };
+        }
+        return null;
       }
       case 'content_block_start': {
         contentBlocks[chunk.index] = chunk.content_block;
@@ -395,12 +429,36 @@ export class AnthropicClient implements ProviderBaseClient {
             return null;
           }
           default: {
-            throw new Error(`Unhandled content block delta type: ${chunk.delta.type}`);
+            console.warn(`Unhandled chunk delta type: ${chunk.delta.type}`);
+            return null;
           }
         }
       }
       default: {
-        throw new Error(`Unhandled chunk type: ${chunk.type}`);
+        console.warn(`Unhandled chunk type: ${chunk.type}`);
+        return null;
+      }
+    }
+  }
+
+  private mapStopReason(stopReason: StopReason): ChatCompletionsV1StopReason {
+    switch (stopReason) {
+      case 'refusal': {
+        return 'content_filter';
+      }
+      case 'tool_use': {
+        return 'tool_calls';
+      }
+      case 'max_tokens': {
+        return 'length';
+      }
+      case 'pause_turn':
+      case 'end_turn':
+      case 'stop_sequence': {
+        return 'stop';
+      }
+      default: {
+        throw new Error(`Unhandled stop reason: ${stopReason}`);
       }
     }
   }
