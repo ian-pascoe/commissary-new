@@ -1,6 +1,7 @@
 import type {
   ContentBlock,
   ContentBlockParam,
+  Message,
   MessageCreateParams,
   MessageParam,
   RawMessageStreamEvent,
@@ -9,6 +10,7 @@ import type {
 } from '@anthropic-ai/sdk/resources';
 import type {
   ChatCompletionsV1Message,
+  ChatCompletionsV1NonStreamingResponseBody,
   ChatCompletionsV1RequestBody,
   ChatCompletionsV1StopReason,
   ChatCompletionsV1StreamingResponseBody,
@@ -34,14 +36,53 @@ export class AnthropicClient implements ProviderBaseClient {
 
   async doGenerate(input: {
     request: ChatCompletionsV1RequestBody;
-  }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
-    throw new Error('Method not implemented.');
+  }): Promise<{ data: ChatCompletionsV1NonStreamingResponseBody }> {
+    const { system, messages } = this.convertRequestMessages(input.request.messages);
+    const anthropicRequest: MessageCreateParams = {
+      model: this.model.slug,
+      max_tokens: input.request.maxOutputTokens ?? 4096,
+      temperature: input.request.temperature ?? undefined,
+      top_k: input.request.topK ?? undefined,
+      top_p: input.request.topP ?? undefined,
+      stop_sequences: input.request.stop ?? undefined,
+      system,
+      messages,
+      stream: false,
+    };
+    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
+      method: 'POST',
+      body: JSON.stringify(anthropicRequest),
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.credential.value}`,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as Message;
+    return {
+      data: {
+        id: data.id,
+        object: 'chat.completion',
+        created: Date.now() / 1000,
+        model: this.model.slug,
+        choices: [
+          {
+            index: 0,
+            message: this.convertResponseMessage(data),
+            finish_reason: data.stop_reason ? this.mapStopReason(data.stop_reason) : 'stop',
+          },
+        ],
+      },
+    };
   }
 
   async doStream(input: {
     request: ChatCompletionsV1RequestBody;
   }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
-    const { system, messages } = this.convertMessages(input.request.messages);
+    const { system, messages } = this.convertRequestMessages(input.request.messages);
     const anthropicRequest: MessageCreateParams = {
       model: this.model.slug,
       max_tokens: input.request.maxOutputTokens ?? 4096,
@@ -53,7 +94,6 @@ export class AnthropicClient implements ProviderBaseClient {
       system,
       messages,
     };
-
     const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
       method: 'POST',
       body: JSON.stringify(anthropicRequest),
@@ -67,7 +107,7 @@ export class AnthropicClient implements ProviderBaseClient {
     }
 
     const reader = response.body?.getReader();
-    const convertToOpenAIFormat = this.convertToOpenAIFormat.bind(this);
+    const convertToOpenAIStreamFormat = this.convertToOpenAIStreamFormat.bind(this);
     const stream = new ReadableStream<RawMessageStreamEvent>({
       async pull(controller) {
         if (!reader) {
@@ -93,7 +133,7 @@ export class AnthropicClient implements ProviderBaseClient {
       new TransformStream<RawMessageStreamEvent, ChatCompletionsV1StreamingResponseBody>({
         async transform(chunk, controller) {
           // Convert chunk to OpenAI format
-          const openAIChunk = convertToOpenAIFormat(chunk);
+          const openAIChunk = convertToOpenAIStreamFormat(chunk);
           if (openAIChunk) {
             controller.enqueue(openAIChunk);
           }
@@ -103,7 +143,7 @@ export class AnthropicClient implements ProviderBaseClient {
     return { stream };
   }
 
-  private convertMessages(messages: ChatCompletionsV1Message[]): {
+  private convertRequestMessages(messages: ChatCompletionsV1Message[]): {
     system: TextBlockParam[];
     messages: MessageParam[];
   } {
@@ -201,7 +241,7 @@ export class AnthropicClient implements ProviderBaseClient {
     return { system, messages: anthropicMessages };
   }
 
-  private convertToOpenAIFormat(
+  private convertToOpenAIStreamFormat(
     chunk: RawMessageStreamEvent,
   ): ChatCompletionsV1StreamingResponseBody | null {
     const defaultMessageProps = {
@@ -459,6 +499,78 @@ export class AnthropicClient implements ProviderBaseClient {
       }
       default: {
         throw new Error(`Unhandled stop reason: ${stopReason}`);
+      }
+    }
+  }
+
+  private convertResponseMessage(
+    data: Message,
+  ): ChatCompletionsV1NonStreamingResponseBody['choices'][number]['message'] {
+    switch (data.role) {
+      case 'assistant': {
+        return {
+          role: 'assistant',
+          content: data.content
+            .filter((c) => c.type === 'text')
+            .map((c) => c.text)
+            .join('\n'),
+          reasoning_content: data.content
+            .filter((c) => c.type === 'thinking' || c.type === 'redacted_thinking')
+            .map((c) => (c.type === 'thinking' ? c.thinking : ''))
+            .join('\n'),
+          tools_calls: data.content
+            .filter(
+              (c) =>
+                c.type === 'tool_use' ||
+                c.type === 'server_tool_use' ||
+                c.type === 'web_search_tool_result',
+            )
+            .map((c) => {
+              switch (c.type) {
+                case 'tool_use': {
+                  return {
+                    index: 0,
+                    type: 'function',
+                    id: c.id,
+                    function: {
+                      arguments: JSON.stringify(c.input),
+                      name: c.name,
+                    },
+                  };
+                }
+                case 'server_tool_use': {
+                  return {
+                    index: 0,
+                    type: 'function',
+                    id: c.id,
+                    function: {
+                      arguments: JSON.stringify(c.input),
+                      name: c.name,
+                    },
+                  };
+                }
+                case 'web_search_tool_result': {
+                  return {
+                    index: 0,
+                    type: 'function',
+                    id: c.tool_use_id,
+                    function: {
+                      arguments: Array.isArray(c.content)
+                        ? JSON.stringify(c.content)
+                        : c.content.error_code,
+                      name: 'web_search_tool',
+                    },
+                  };
+                }
+                default: {
+                  throw new Error(`Unhandled content block type: ${(c as any).type}`);
+                }
+              }
+            }),
+        };
+      }
+      default: {
+        throw new Error(`Unsupported message role: ${(data as any).role}`);
       }
     }
   }

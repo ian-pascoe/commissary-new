@@ -1,4 +1,5 @@
 import {
+  ChatCompletionsV1NonStreamingResponseBody,
   ChatCompletionsV1StreamingResponseBody,
   type ChatCompletionsV1RequestBody,
 } from '~/api/schemas/v1/chat';
@@ -20,10 +21,35 @@ export class OpenAIClient implements ProviderBaseClient {
     this.model = input.model;
   }
 
-  doGenerate(input: {
+  async doGenerate(input: {
     request: ChatCompletionsV1RequestBody;
-  }): PromiseLike<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
-    throw new Error('Method not implemented.');
+  }): Promise<{ data: ChatCompletionsV1NonStreamingResponseBody }> {
+    const params: ChatCompletionCreateParams = {
+      model: this.model.modelId,
+      messages: input.request.messages,
+      temperature: input.request.temperature,
+      top_p: input.request.topP,
+      stop: input.request.stop,
+      max_tokens: input.request.maxOutputTokens,
+      presence_penalty: input.request.presencePenalty,
+      frequency_penalty: input.request.frequencyPenalty,
+      user: input.request.user ?? undefined,
+      stream: false,
+    };
+    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.credential.value}`,
+      },
+      body: JSON.stringify(params),
+    });
+    if (!response.ok) {
+      throw new Error(`OpenAI API request failed with status ${response.status}`);
+    }
+
+    const data = (await response.json()) as ChatCompletionsV1NonStreamingResponseBody;
+    return { data };
   }
 
   async doStream(input: {
@@ -34,12 +60,12 @@ export class OpenAIClient implements ProviderBaseClient {
       messages: input.request.messages,
       temperature: input.request.temperature,
       top_p: input.request.topP,
-      stream: input.request.stream,
       stop: input.request.stop,
       max_tokens: input.request.maxOutputTokens,
       presence_penalty: input.request.presencePenalty,
       frequency_penalty: input.request.frequencyPenalty,
       user: input.request.user ?? undefined,
+      stream: true,
     };
     const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
       method: 'POST',

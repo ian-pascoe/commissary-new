@@ -1,4 +1,5 @@
 import type {
+  ChatCompletionsV1NonStreamingResponseBody,
   ChatCompletionsV1RequestBody,
   ChatCompletionsV1StreamingResponseBody,
 } from '~/api/schemas/v1/chat';
@@ -11,7 +12,7 @@ export interface ProviderBaseClient {
 
   doGenerate(input: {
     request: ChatCompletionsV1RequestBody;
-  }): PromiseLike<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }>;
+  }): PromiseLike<{ data: ChatCompletionsV1NonStreamingResponseBody }>;
 
   doStream(input: {
     request: ChatCompletionsV1RequestBody;

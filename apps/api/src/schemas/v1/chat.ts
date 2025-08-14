@@ -3,14 +3,14 @@ import * as z from 'zod';
 export const ChatCompletionsV1SystemMessage = z.object({
   role: z.literal('system'),
   content: z.string(),
-  name: z.optional(z.string()),
+  name: z.nullish(z.string()),
 });
 export type ChatCompletionsV1SystemMessage = z.infer<typeof ChatCompletionsV1SystemMessage>;
 
 export const ChatCompletionsV1DeveloperMessage = z.object({
   role: z.literal('developer'),
   content: z.string(),
-  name: z.optional(z.string()),
+  name: z.nullish(z.string()),
 });
 export type ChatCompletionsV1DeveloperMessage = z.infer<typeof ChatCompletionsV1DeveloperMessage>;
 
@@ -28,7 +28,7 @@ export const ChatCompletionsV1UserMessage = z.object({
           type: z.literal('image_url'),
           image_url: z.object({
             url: z.string(),
-            detail: z.optional(z.enum(['auto', 'low', 'high'])),
+            detail: z.nullish(z.enum(['auto', 'low', 'high'])),
           }),
         }),
         z.object({
@@ -41,26 +41,26 @@ export const ChatCompletionsV1UserMessage = z.object({
         z.object({
           type: z.literal('file'),
           file: z.object({
-            file_data: z.optional(z.string()),
-            file_id: z.optional(z.string()),
-            filename: z.optional(z.string()),
+            file_data: z.nullish(z.string()),
+            file_id: z.nullish(z.string()),
+            filename: z.nullish(z.string()),
           }),
         }),
       ]),
     ),
   ]),
-  name: z.optional(z.string()),
+  name: z.nullish(z.string()),
 });
 export type ChatCompletionsV1UserMessage = z.infer<typeof ChatCompletionsV1UserMessage>;
 
 export const ChatCompletionsV1AssistantMessage = z.object({
   role: z.literal('assistant'),
-  audio: z.optional(
+  audio: z.nullish(
     z.object({
       id: z.string(),
     }),
   ),
-  content: z.optional(
+  content: z.nullish(
     z.union([
       z.string(),
       z.array(
@@ -77,15 +77,16 @@ export const ChatCompletionsV1AssistantMessage = z.object({
       ),
     ]),
   ),
-  function_call: z.optional(
+  reasoning_content: z.nullish(z.string()),
+  function_call: z.nullish(
     z.object({
       arguments: z.string(),
       name: z.string(),
     }),
   ),
-  name: z.optional(z.string()),
-  refusal: z.optional(z.string()),
-  tool_calls: z.optional(
+  name: z.nullish(z.string()),
+  refusal: z.nullish(z.string()),
+  tool_calls: z.nullish(
     z.array(
       z.object({
         id: z.string(),
@@ -272,13 +273,16 @@ export const ChatCompletionsV1NonStreamingResponseBody = z.object({
       logprobs: z.nullish(ChatCompletionsV1Logprobs),
       message: z.object({
         content: z.nullish(z.string()),
+        reasoning_content: z.nullish(z.string()),
         refusal: z.nullish(z.string()),
         role: z.string(),
-        annotations: z.array(
-          z.object({
-            type: z.string(),
-            url_citation: z.string(),
-          }),
+        annotations: z.nullish(
+          z.array(
+            z.object({
+              type: z.string(),
+              url_citation: z.string(),
+            }),
+          ),
         ),
         audio: z.nullish(
           z.object({
