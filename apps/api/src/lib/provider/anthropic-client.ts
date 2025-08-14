@@ -68,6 +68,21 @@ export class AnthropicClient implements ProviderBaseClient {
         object: 'chat.completion',
         created: Date.now() / 1000,
         model: this.model.slug,
+        usage: {
+          prompt_tokens: data.usage.input_tokens,
+          completion_tokens: data.usage.output_tokens,
+          total_tokens: data.usage.input_tokens + data.usage.output_tokens,
+          prompt_tokens_details: {
+            cached_tokens: data.usage.cache_read_input_tokens ?? 0,
+            audio_tokens: 0,
+          },
+          completion_tokens_details: {
+            accepted_prediction_tokens: data.usage.output_tokens,
+            rejected_prediction_tokens: 0,
+            reasoning_tokens: 0,
+            audio_tokens: 0,
+          },
+        },
         choices: [
           {
             index: 0,
@@ -255,10 +270,23 @@ export class AnthropicClient implements ProviderBaseClient {
     switch (chunk.type) {
       case 'message_start': {
         usage = {
-          ...usage,
           prompt_tokens: chunk.message.usage.input_tokens,
           completion_tokens: chunk.message.usage.output_tokens,
           total_tokens: chunk.message.usage.input_tokens + chunk.message.usage.output_tokens,
+          prompt_tokens_details: {
+            cached_tokens:
+              chunk.message.usage.cache_read_input_tokens ??
+              usage.prompt_tokens_details?.cached_tokens ??
+              0,
+            audio_tokens: usage.prompt_tokens_details?.audio_tokens ?? 0,
+          },
+          completion_tokens_details: {
+            accepted_prediction_tokens: chunk.message.usage.output_tokens,
+            rejected_prediction_tokens:
+              usage.completion_tokens_details?.rejected_prediction_tokens ?? 0,
+            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
+            audio_tokens: usage.completion_tokens_details?.audio_tokens ?? 0,
+          },
         };
         return {
           ...defaultMessageProps,
@@ -273,11 +301,24 @@ export class AnthropicClient implements ProviderBaseClient {
       }
       case 'message_delta': {
         usage = {
-          ...usage,
-          ...(chunk.usage.input_tokens ? { prompt_tokens: chunk.usage.input_tokens } : {}),
+          prompt_tokens: chunk.usage.input_tokens ?? usage.prompt_tokens ?? 0,
           completion_tokens: chunk.usage.output_tokens,
           total_tokens:
             (chunk.usage.input_tokens ?? usage.prompt_tokens ?? 0) + chunk.usage.output_tokens,
+          prompt_tokens_details: {
+            cached_tokens:
+              chunk.usage.cache_read_input_tokens ??
+              usage.prompt_tokens_details?.cached_tokens ??
+              0,
+            audio_tokens: usage.prompt_tokens_details?.audio_tokens ?? 0,
+          },
+          completion_tokens_details: {
+            accepted_prediction_tokens: chunk.usage.output_tokens,
+            rejected_prediction_tokens:
+              usage.completion_tokens_details?.rejected_prediction_tokens ?? 0,
+            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
+            audio_tokens: usage.completion_tokens_details?.audio_tokens ?? 0,
+          },
         };
         if (chunk.delta.stop_reason) {
           return {

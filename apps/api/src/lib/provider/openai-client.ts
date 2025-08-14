@@ -1,10 +1,10 @@
-import {
+import type { ChatCompletionCreateParams } from 'openai/resources';
+import type {
   ChatCompletionsV1NonStreamingResponseBody,
+  ChatCompletionsV1RequestBody,
   ChatCompletionsV1StreamingResponseBody,
-  type ChatCompletionsV1RequestBody,
 } from '~/api/schemas/v1/chat';
 import type { ProviderBaseClient } from './base-client';
-import type { ChatCompletionCreateParams } from 'openai/resources';
 
 export class OpenAIClient implements ProviderBaseClient {
   provider;
