@@ -3,7 +3,11 @@ import type {
   ChatCompletionsV1RequestBody,
   ChatCompletionsV1StreamingResponseBody,
 } from '~/api/schemas/v1/chat';
-import type { Provider, ProviderCredential, ProviderModel } from '~/core/schemas/database';
+import type {
+  Provider,
+  ProviderCredential,
+  ProviderModel,
+} from '~/core/schemas/database';
 
 export interface ProviderBaseClient {
   provider: Provider;
@@ -16,5 +20,7 @@ export interface ProviderBaseClient {
 
   doStream(input: {
     request: ChatCompletionsV1RequestBody;
-  }): PromiseLike<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }>;
+  }): PromiseLike<{
+    stream: ReadableStream<ChatCompletionsV1StreamingResponseBody>;
+  }>;
 }

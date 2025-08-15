@@ -5,7 +5,9 @@ export const baseModel = (prefix: string) => ({
   id: text('id')
     .primaryKey()
     .$defaultFn(() => createId(prefix)),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(
+    () => new Date(),
+  ),
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .$defaultFn(() => new Date())
     .$onUpdateFn(() => new Date()),

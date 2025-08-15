@@ -11,7 +11,11 @@ import {
   UpdateModel,
   UpdatePrice,
 } from '~/core/schemas/database';
-import { modelsTable, priceBookTable, providerModelsTable } from '~/drizzle/schema';
+import {
+  modelsTable,
+  priceBookTable,
+  providerModelsTable,
+} from '~/drizzle/schema';
 import { factory } from '../../utils/factory';
 
 export const modelsRoute = factory
@@ -25,7 +29,10 @@ export const modelsRoute = factory
         ...getTableColumns(providerModelsTable),
       })
       .from(modelsTable)
-      .innerJoin(providerModelsTable, eq(modelsTable.id, providerModelsTable.modelId));
+      .innerJoin(
+        providerModelsTable,
+        eq(modelsTable.id, providerModelsTable.modelId),
+      );
 
     return c.json({ data: models });
   })
@@ -54,7 +61,10 @@ export const modelsRoute = factory
         }
         model = existingModel;
       } else {
-        const [newModel] = await db.insert(modelsTable).values(values).returning();
+        const [newModel] = await db
+          .insert(modelsTable)
+          .values(values)
+          .returning();
         if (!newModel) {
           throw new HTTPException(500, { message: 'Failed to create model' });
         }
@@ -68,7 +78,9 @@ export const modelsRoute = factory
         })
         .returning();
       if (!providerModel) {
-        throw new HTTPException(500, { message: 'Failed to create provider model' });
+        throw new HTTPException(500, {
+          message: 'Failed to create provider model',
+        });
       }
 
       const prices: Price[] = [];
@@ -121,7 +133,10 @@ export const modelsRoute = factory
           }
           model = existingModel;
         } else {
-          const [newModel] = await db.insert(modelsTable).values(item).returning();
+          const [newModel] = await db
+            .insert(modelsTable)
+            .values(item)
+            .returning();
           if (!newModel) {
             throw new HTTPException(500, { message: 'Failed to create model' });
           }
@@ -133,7 +148,9 @@ export const modelsRoute = factory
           .values({ ...item, modelId: model.id })
           .returning();
         if (!providerModel) {
-          throw new HTTPException(500, { message: 'Failed to create provider model' });
+          throw new HTTPException(500, {
+            message: 'Failed to create provider model',
+          });
         }
 
         const prices: Price[] = [];
@@ -148,7 +165,9 @@ export const modelsRoute = factory
             )
             .returning();
           if (!newPrice) {
-            throw new HTTPException(500, { message: 'Failed to create pricing' });
+            throw new HTTPException(500, {
+              message: 'Failed to create pricing',
+            });
           }
 
           pricing.push(newPrice);
@@ -164,7 +183,10 @@ export const modelsRoute = factory
     const db = c.get('db');
     const id = c.req.param('id');
 
-    const [model] = await db.select().from(modelsTable).where(eq(modelsTable.id, id));
+    const [model] = await db
+      .select()
+      .from(modelsTable)
+      .where(eq(modelsTable.id, id));
     if (!model) {
       throw new HTTPException(404, { message: 'Model not found' });
     }
@@ -192,32 +214,40 @@ export const modelsRoute = factory
       return c.json({ data: model });
     },
   )
-  .delete('/:id', validator('param', z.object({ id: z.string() })), async (c) => {
-    const db = c.get('db');
-    const id = c.req.param('id');
+  .delete(
+    '/:id',
+    validator('param', z.object({ id: z.string() })),
+    async (c) => {
+      const db = c.get('db');
+      const id = c.req.param('id');
 
-    const [model] = await db
-      .update(modelsTable)
-      .set({ deletedAt: new Date() })
-      .where(eq(modelsTable.id, id))
-      .returning({ id: modelsTable.id });
-    if (!model) {
-      throw new HTTPException(404, { message: 'Model not found' });
-    }
+      const [model] = await db
+        .update(modelsTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(modelsTable.id, id))
+        .returning({ id: modelsTable.id });
+      if (!model) {
+        throw new HTTPException(404, { message: 'Model not found' });
+      }
 
-    return c.json({ data: model.id });
-  })
-  .get('/:id/prices', validator('param', z.object({ id: z.string() })), async (c) => {
-    const db = c.get('db');
-    const id = c.req.param('id');
+      return c.json({ data: model.id });
+    },
+  )
+  .get(
+    '/:id/prices',
+    validator('param', z.object({ id: z.string() })),
+    async (c) => {
+      const db = c.get('db');
+      const id = c.req.param('id');
 
-    const prices = await db
-      .select()
-      .from(priceBookTable)
-      .where(eq(priceBookTable.providerModelId, id));
+      const prices = await db
+        .select()
+        .from(priceBookTable)
+        .where(eq(priceBookTable.providerModelId, id));
 
-    return c.json({ data: prices });
-  })
+      return c.json({ data: prices });
+    },
+  )
   .post(
     '/:id/prices',
     validator('param', z.object({ id: z.string() })),
@@ -248,7 +278,12 @@ export const modelsRoute = factory
       const [price] = await db
         .select()
         .from(priceBookTable)
-        .where(and(eq(priceBookTable.providerModelId, id), eq(priceBookTable.id, priceId)));
+        .where(
+          and(
+            eq(priceBookTable.providerModelId, id),
+            eq(priceBookTable.id, priceId),
+          ),
+        );
 
       if (!price) {
         throw new HTTPException(404, { message: 'Price not found' });
@@ -269,7 +304,12 @@ export const modelsRoute = factory
       const [price] = await db
         .update(priceBookTable)
         .set(values)
-        .where(and(eq(priceBookTable.providerModelId, id), eq(priceBookTable.id, priceId)))
+        .where(
+          and(
+            eq(priceBookTable.providerModelId, id),
+            eq(priceBookTable.id, priceId),
+          ),
+        )
         .returning();
 
       if (!price) {
@@ -289,7 +329,12 @@ export const modelsRoute = factory
       const [price] = await db
         .update(priceBookTable)
         .set({ deletedAt: new Date() })
-        .where(and(eq(priceBookTable.providerModelId, id), eq(priceBookTable.id, priceId)))
+        .where(
+          and(
+            eq(priceBookTable.providerModelId, id),
+            eq(priceBookTable.id, priceId),
+          ),
+        )
         .returning();
       if (!price) {
         throw new HTTPException(404, { message: 'Price not found' });

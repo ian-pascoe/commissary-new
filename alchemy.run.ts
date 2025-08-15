@@ -85,7 +85,9 @@ const kv = await KVNamespace('kv', {
 // API
 const apiDomain = `api.${domain}`;
 const apiDevPort = 8787;
-const apiUrl = app.local ? `http://localhost:${apiDevPort}` : `https://${apiDomain}`;
+const apiUrl = app.local
+  ? `http://localhost:${apiDevPort}`
+  : `https://${apiDomain}`;
 const stripeWebhookEndpoint = await WebhookEndpoint('stripe-webhook', {
   url: `https://${apiDomain}/stripe/webhook`,
   enabledEvents: ['*'],
@@ -100,6 +102,8 @@ export const api = await Worker('api', {
     KV: kv,
 
     API_URL: apiUrl,
+
+    BETTER_AUTH_SECRET: alchemy.secret(process.env.BETTER_AUTH_SECRET),
 
     STRIPE_PUBLIC_KEY: alchemy.secret(process.env.STRIPE_PUBLIC_KEY),
     STRIPE_SECRET_KEY: alchemy.secret(process.env.STRIPE_SECRET_KEY),

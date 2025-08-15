@@ -1,9 +1,9 @@
 import { getTableColumns, type SQL, sql, type Table } from 'drizzle-orm';
 
-export function conflictUpdateAllExcept<T extends Table, E extends (keyof T['$inferInsert'])[]>(
-  table: T,
-  except: E,
-) {
+export function conflictUpdateAllExcept<
+  T extends Table,
+  E extends (keyof T['$inferInsert'])[],
+>(table: T, except: E) {
   const columns = getTableColumns(table);
   const updateColumns = Object.entries(columns).filter(
     ([col]) => !except.includes(col as keyof typeof table.$inferInsert),

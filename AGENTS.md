@@ -1,4 +1,3 @@
-
 # Project Overview
 
 This project is a typescript application that is an open-source implementation of [OpenRouter](https://openrouter.ai/), aiming to provide feature parity with stronger user experience (UX).
@@ -21,7 +20,7 @@ This project is a typescript application that is an open-source implementation o
   - Always import zod using the syntax:
 
     ```typescript
-    import * as z from 'zod';
+    import * as z from "zod";
     ```
 
   - When creating schemas for database models, always use `createSelectSchema`, `createInsertSchema`, and `createUpdateSchema` from `drizzle-zod`.

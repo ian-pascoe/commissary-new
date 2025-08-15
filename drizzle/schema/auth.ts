@@ -1,4 +1,10 @@
-import { boolean, integer, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+} from 'drizzle-orm/pg-core';
 import { createId } from '~/core/utils/id';
 
 export const usersTable = pgTable('users', {
@@ -40,8 +46,12 @@ export const accountsTable = pgTable('accounts', {
   accessToken: text('access_token'),
   refreshToken: text('refresh_token'),
   idToken: text('id_token'),
-  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
-  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', {
+    withTimezone: true,
+  }),
   scope: text('scope'),
   password: text('password'),
 });
@@ -50,8 +60,12 @@ export const verificationsTable = pgTable('verifications', {
   id: text('id')
     .primaryKey()
     .$defaultFn(() => createId('ver')),
-  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(() => new Date()),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(() => new Date()),
+  createdAt: timestamp('created_at', { withTimezone: true }).$defaultFn(
+    () => new Date(),
+  ),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).$defaultFn(
+    () => new Date(),
+  ),
 
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
@@ -85,22 +99,25 @@ export const organizationMembersTable = pgTable('organization_members', {
   role: text('role').default('member').notNull(),
 });
 
-export const organizationInvitationsTable = pgTable('organization_invitations', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => createId('oinv')),
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organizationsTable.id, { onDelete: 'cascade' }),
-  email: text('email').notNull(),
-  role: text('role'),
-  teamId: text('team_id'),
-  status: text('status').default('pending').notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  inviterId: text('inviter_id')
-    .notNull()
-    .references(() => usersTable.id, { onDelete: 'cascade' }),
-});
+export const organizationInvitationsTable = pgTable(
+  'organization_invitations',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => createId('oinv')),
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role'),
+    teamId: text('team_id'),
+    status: text('status').default('pending').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    inviterId: text('inviter_id')
+      .notNull()
+      .references(() => usersTable.id, { onDelete: 'cascade' }),
+  },
+);
 
 export const teamsTable = pgTable('teams', {
   id: text('id')

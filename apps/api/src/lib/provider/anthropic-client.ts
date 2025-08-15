@@ -7,6 +7,9 @@ import type {
   RawMessageStreamEvent,
   StopReason,
   TextBlockParam,
+  Tool,
+  ToolChoice,
+  ToolUnion,
 } from '@anthropic-ai/sdk/resources';
 import type {
   ChatCompletionsV1Message,
@@ -37,28 +40,50 @@ export class AnthropicClient implements ProviderBaseClient {
   async doGenerate(input: {
     request: ChatCompletionsV1RequestBody;
   }): Promise<{ data: ChatCompletionsV1NonStreamingResponseBody }> {
-    const { system, messages } = this.convertRequestMessages(input.request.messages);
+    const { system, messages } = this.convertRequestMessages(
+      input.request.messages,
+    );
     const anthropicRequest: MessageCreateParams = {
-      model: this.model.slug,
-      max_tokens: input.request.maxOutputTokens ?? 4096,
+      ...input.request,
+      metadata: input.request.metadata ?? undefined,
+      service_tier:
+        typeof input.request.service_tier === 'undefined' ||
+        input.request.service_tier === null
+          ? undefined
+          : input.request.service_tier === 'auto'
+            ? 'auto'
+            : 'standard_only',
+      max_tokens:
+        input.request.max_completion_tokens ?? input.request.max_tokens ?? 4096,
       temperature: input.request.temperature ?? undefined,
-      top_k: input.request.topK ?? undefined,
-      top_p: input.request.topP ?? undefined,
-      stop_sequences: input.request.stop ?? undefined,
+      top_k: input.request.top_k ?? undefined,
+      top_p: input.request.top_p ?? undefined,
+      tools: this.convertTools(input.request.tools),
+      tool_choice: this.convertToolChoice(input.request.tool_choice),
+      stop_sequences:
+        typeof input.request.stop === 'string'
+          ? [input.request.stop]
+          : (input.request.stop ?? undefined),
+      model: this.model.slug,
+      stream: false,
       system,
       messages,
-      stream: false,
     };
-    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
-      method: 'POST',
-      body: JSON.stringify(anthropicRequest),
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.credential.value}`,
+    const response = await fetch(
+      `${this.provider.baseUrl}${this.model.endpointPath}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(anthropicRequest),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.credential.value}`,
+        },
       },
-    });
+    );
     if (!response.ok) {
-      throw new Error(`Anthropic API request failed with status ${response.status}`);
+      throw new Error(
+        `Anthropic API request failed with status ${response.status}`,
+      );
     }
 
     const data = (await response.json()) as Message;
@@ -87,7 +112,9 @@ export class AnthropicClient implements ProviderBaseClient {
           {
             index: 0,
             message: this.convertResponseMessage(data),
-            finish_reason: data.stop_reason ? this.mapStopReason(data.stop_reason) : 'stop',
+            finish_reason: data.stop_reason
+              ? this.mapStopReason(data.stop_reason)
+              : 'stop',
           },
         ],
       },
@@ -96,33 +123,97 @@ export class AnthropicClient implements ProviderBaseClient {
 
   async doStream(input: {
     request: ChatCompletionsV1RequestBody;
-  }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
-    const { system, messages } = this.convertRequestMessages(input.request.messages);
+  }): Promise<{
+    stream: ReadableStream<ChatCompletionsV1StreamingResponseBody>;
+  }> {
+    const { system, messages } = this.convertRequestMessages(
+      input.request.messages,
+    );
     const anthropicRequest: MessageCreateParams = {
-      model: this.model.slug,
-      max_tokens: input.request.maxOutputTokens ?? 4096,
+      ...input.request,
+      metadata: input.request.metadata ?? undefined,
+      service_tier:
+        typeof input.request.service_tier === 'undefined' ||
+        input.request.service_tier === null
+          ? undefined
+          : input.request.service_tier === 'auto'
+            ? 'auto'
+            : 'standard_only',
+      max_tokens:
+        input.request.max_completion_tokens ?? input.request.max_tokens ?? 4096,
       temperature: input.request.temperature ?? undefined,
-      top_k: input.request.topK ?? undefined,
-      top_p: input.request.topP ?? undefined,
+      top_k: input.request.top_k ?? undefined,
+      top_p: input.request.top_p ?? undefined,
+      tools: input.request.tools?.map((c) => {
+        switch (c.type) {
+          case 'function': {
+            return {
+              name: c.function.name,
+              description: c.function.description,
+              input_schema: c.function.parameters,
+            };
+          }
+          case 'custom': {
+            return {
+              name: c.custom.name,
+              description: c.custom.description,
+              input_schema: c.custom.format,
+            };
+          }
+          default: {
+            throw new Error(`Unsupported tool type: ${(c as any).type}`);
+          }
+        }
+      }),
+      tool_choice:
+        typeof input.request.tool_choice === 'undefined'
+          ? undefined
+          : input.request.tool_choice === 'auto'
+            ? { type: 'auto' }
+            : input.request.tool_choice === 'required'
+              ? { type: 'any' }
+              : input.request.tool_choice === 'none'
+                ? { type: 'none' }
+                : input.request.tool_choice.type === 'function'
+                  ? {
+                      type: 'tool',
+                      name: input.request.tool_choice.function.name,
+                    }
+                  : input.request.tool_choice.type === 'allowed_tools'
+                    ? { type: 'any' }
+                    : {
+                        type: 'tool',
+                        name: input.request.tool_choice.custom.name,
+                      },
+      stop_sequences:
+        typeof input.request.stop === 'string'
+          ? [input.request.stop]
+          : (input.request.stop ?? undefined),
+      model: this.model.slug,
       stream: true,
-      stop_sequences: input.request.stop ?? undefined,
       system,
       messages,
     };
-    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
-      method: 'POST',
-      body: JSON.stringify(anthropicRequest),
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.credential.value}`,
+    const response = await fetch(
+      `${this.provider.baseUrl}${this.model.endpointPath}`,
+      {
+        method: 'POST',
+        body: JSON.stringify(anthropicRequest),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.credential.value}`,
+        },
       },
-    });
+    );
     if (!response.ok) {
-      throw new Error(`Anthropic API request failed with status ${response.status}`);
+      throw new Error(
+        `Anthropic API request failed with status ${response.status}`,
+      );
     }
 
     const reader = response.body?.getReader();
-    const convertToOpenAIStreamFormat = this.convertToOpenAIStreamFormat.bind(this);
+    const convertToOpenAIStreamFormat =
+      this.convertToOpenAIStreamFormat.bind(this);
     const stream = new ReadableStream<RawMessageStreamEvent>({
       async pull(controller) {
         if (!reader) {
@@ -145,7 +236,10 @@ export class AnthropicClient implements ProviderBaseClient {
         }
       },
     }).pipeThrough(
-      new TransformStream<RawMessageStreamEvent, ChatCompletionsV1StreamingResponseBody>({
+      new TransformStream<
+        RawMessageStreamEvent,
+        ChatCompletionsV1StreamingResponseBody
+      >({
         async transform(chunk, controller) {
           // Convert chunk to OpenAI format
           const openAIChunk = convertToOpenAIStreamFormat(chunk);
@@ -203,7 +297,9 @@ export class AnthropicClient implements ProviderBaseClient {
                       };
                     }
                     case 'input_audio': {
-                      throw new Error('Anthropic does not support audio messages');
+                      throw new Error(
+                        'Anthropic does not support audio messages',
+                      );
                     }
                     case 'refusal': {
                       return {
@@ -212,7 +308,9 @@ export class AnthropicClient implements ProviderBaseClient {
                       };
                     }
                     default: {
-                      throw new Error(`Unsupported content block type: ${(c as any).type}`);
+                      throw new Error(
+                        `Unsupported content block type: ${(c as any).type}`,
+                      );
                     }
                   }
                 }) ?? []),
@@ -265,27 +363,30 @@ export class AnthropicClient implements ProviderBaseClient {
       created: Date.now() / 1000,
       model: this.model.slug,
     } as const satisfies Partial<ChatCompletionsV1StreamingResponseBody>;
-    let usage: Partial<ChatCompletionsV1Usage> = {};
+    let usage: ChatCompletionsV1Usage | undefined;
     const contentBlocks: ContentBlock[] = [];
     switch (chunk.type) {
       case 'message_start': {
         usage = {
           prompt_tokens: chunk.message.usage.input_tokens,
           completion_tokens: chunk.message.usage.output_tokens,
-          total_tokens: chunk.message.usage.input_tokens + chunk.message.usage.output_tokens,
+          total_tokens:
+            chunk.message.usage.input_tokens +
+            chunk.message.usage.output_tokens,
           prompt_tokens_details: {
             cached_tokens:
               chunk.message.usage.cache_read_input_tokens ??
-              usage.prompt_tokens_details?.cached_tokens ??
+              usage?.prompt_tokens_details?.cached_tokens ??
               0,
-            audio_tokens: usage.prompt_tokens_details?.audio_tokens ?? 0,
+            audio_tokens: usage?.prompt_tokens_details?.audio_tokens ?? 0,
           },
           completion_tokens_details: {
             accepted_prediction_tokens: chunk.message.usage.output_tokens,
             rejected_prediction_tokens:
-              usage.completion_tokens_details?.rejected_prediction_tokens ?? 0,
-            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
-            audio_tokens: usage.completion_tokens_details?.audio_tokens ?? 0,
+              usage?.completion_tokens_details?.rejected_prediction_tokens ?? 0,
+            reasoning_tokens:
+              usage?.completion_tokens_details?.reasoning_tokens ?? 0,
+            audio_tokens: usage?.completion_tokens_details?.audio_tokens ?? 0,
           },
         };
         return {
@@ -301,23 +402,25 @@ export class AnthropicClient implements ProviderBaseClient {
       }
       case 'message_delta': {
         usage = {
-          prompt_tokens: chunk.usage.input_tokens ?? usage.prompt_tokens ?? 0,
+          prompt_tokens: chunk.usage.input_tokens ?? usage?.prompt_tokens ?? 0,
           completion_tokens: chunk.usage.output_tokens,
           total_tokens:
-            (chunk.usage.input_tokens ?? usage.prompt_tokens ?? 0) + chunk.usage.output_tokens,
+            (chunk.usage.input_tokens ?? usage?.prompt_tokens ?? 0) +
+            chunk.usage.output_tokens,
           prompt_tokens_details: {
             cached_tokens:
               chunk.usage.cache_read_input_tokens ??
-              usage.prompt_tokens_details?.cached_tokens ??
+              usage?.prompt_tokens_details?.cached_tokens ??
               0,
-            audio_tokens: usage.prompt_tokens_details?.audio_tokens ?? 0,
+            audio_tokens: usage?.prompt_tokens_details?.audio_tokens ?? 0,
           },
           completion_tokens_details: {
             accepted_prediction_tokens: chunk.usage.output_tokens,
             rejected_prediction_tokens:
-              usage.completion_tokens_details?.rejected_prediction_tokens ?? 0,
-            reasoning_tokens: usage.completion_tokens_details?.reasoning_tokens ?? 0,
-            audio_tokens: usage.completion_tokens_details?.audio_tokens ?? 0,
+              usage?.completion_tokens_details?.rejected_prediction_tokens ?? 0,
+            reasoning_tokens:
+              usage?.completion_tokens_details?.reasoning_tokens ?? 0,
+            audio_tokens: usage?.completion_tokens_details?.audio_tokens ?? 0,
           },
         };
         if (chunk.delta.stop_reason) {
@@ -556,7 +659,9 @@ export class AnthropicClient implements ProviderBaseClient {
             .map((c) => c.text)
             .join('\n'),
           reasoning_content: data.content
-            .filter((c) => c.type === 'thinking' || c.type === 'redacted_thinking')
+            .filter(
+              (c) => c.type === 'thinking' || c.type === 'redacted_thinking',
+            )
             .map((c) => (c.type === 'thinking' ? c.thinking : ''))
             .join('\n'),
           tools_calls: data.content
@@ -604,7 +709,9 @@ export class AnthropicClient implements ProviderBaseClient {
                   };
                 }
                 default: {
-                  throw new Error(`Unhandled content block type: ${(c as any).type}`);
+                  throw new Error(
+                    `Unhandled content block type: ${(c as any).type}`,
+                  );
                 }
               }
             }),
@@ -614,5 +721,48 @@ export class AnthropicClient implements ProviderBaseClient {
         throw new Error(`Unsupported message role: ${(data as any).role}`);
       }
     }
+  }
+
+  private convertTools(
+    tools: ChatCompletionsV1RequestBody['tools'],
+  ): ToolUnion[] {
+    if (!tools || tools.length === 0) {
+      return [];
+    }
+    return tools.map((tool): Tool => {
+      switch (tool.type) {
+        case 'function': {
+          return {
+            name: tool.function.name,
+            description: tool.function.description,
+            input_schema: tool.function.parameters,
+          };
+        }
+        case 'custom': {
+          throw new Error('Anthropic does not support custom tools yet');
+        }
+        default: {
+          throw new Error(`Unsupported tool type: ${(tool as any).type}`);
+        }
+      }
+    });
+  }
+
+  private convertToolChoice(
+    toolChoice: ChatCompletionsV1RequestBody['tool_choice'],
+  ): ToolChoice | undefined {
+    return typeof toolChoice === 'undefined'
+      ? undefined
+      : toolChoice === 'auto'
+        ? { type: 'auto' }
+        : toolChoice === 'required'
+          ? { type: 'any' }
+          : toolChoice === 'none'
+            ? { type: 'none' }
+            : toolChoice.type === 'function'
+              ? { type: 'tool', name: toolChoice.function.name }
+              : toolChoice.type === 'allowed_tools'
+                ? { type: 'any' }
+                : { type: 'tool', name: toolChoice.custom.name };
   }
 }

@@ -25,58 +25,57 @@ export class OpenAIClient implements ProviderBaseClient {
     request: ChatCompletionsV1RequestBody;
   }): Promise<{ data: ChatCompletionsV1NonStreamingResponseBody }> {
     const params: ChatCompletionCreateParams = {
+      ...input.request,
       model: this.model.modelId,
-      messages: input.request.messages,
-      temperature: input.request.temperature,
-      top_p: input.request.topP,
-      stop: input.request.stop,
-      max_tokens: input.request.maxOutputTokens,
-      presence_penalty: input.request.presencePenalty,
-      frequency_penalty: input.request.frequencyPenalty,
-      user: input.request.user ?? undefined,
       stream: false,
     };
-    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.credential.value}`,
+    const response = await fetch(
+      `${this.provider.baseUrl}${this.model.endpointPath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.credential.value}`,
+        },
+        body: JSON.stringify(params),
       },
-      body: JSON.stringify(params),
-    });
+    );
     if (!response.ok) {
-      throw new Error(`OpenAI API request failed with status ${response.status}`);
+      throw new Error(
+        `OpenAI API request failed with status ${response.status}`,
+      );
     }
 
-    const data = (await response.json()) as ChatCompletionsV1NonStreamingResponseBody;
+    const data =
+      (await response.json()) as ChatCompletionsV1NonStreamingResponseBody;
     return { data };
   }
 
   async doStream(input: {
     request: ChatCompletionsV1RequestBody;
-  }): Promise<{ stream: ReadableStream<ChatCompletionsV1StreamingResponseBody> }> {
+  }): Promise<{
+    stream: ReadableStream<ChatCompletionsV1StreamingResponseBody>;
+  }> {
     const params: ChatCompletionCreateParams = {
+      ...input.request,
       model: this.model.modelId,
-      messages: input.request.messages,
-      temperature: input.request.temperature,
-      top_p: input.request.topP,
-      stop: input.request.stop,
-      max_tokens: input.request.maxOutputTokens,
-      presence_penalty: input.request.presencePenalty,
-      frequency_penalty: input.request.frequencyPenalty,
-      user: input.request.user ?? undefined,
       stream: true,
     };
-    const response = await fetch(`${this.provider.baseUrl}${this.model.endpointPath}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.credential.value}`,
+    const response = await fetch(
+      `${this.provider.baseUrl}${this.model.endpointPath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.credential.value}`,
+        },
+        body: JSON.stringify(params),
       },
-      body: JSON.stringify(params),
-    });
+    );
     if (!response.ok) {
-      throw new Error(`OpenAI API request failed with status ${response.status}`);
+      throw new Error(
+        `OpenAI API request failed with status ${response.status}`,
+      );
     }
 
     const reader = response.body?.getReader();

@@ -3,7 +3,11 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { admin, apiKey, bearer, organization } from 'better-auth/plugins';
 import type { Context } from 'hono';
-import { apiKeyPluginConfig, authConfig, organizationPluginConfig } from '~/auth.config';
+import {
+  apiKeyPluginConfig,
+  authConfig,
+  organizationPluginConfig,
+} from '~/auth.config';
 import type { Env } from '../types/hono';
 import { c } from '../utils/context';
 import { env } from '../utils/env';

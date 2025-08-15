@@ -1,6 +1,7 @@
 import { and, eq, getTableColumns } from 'drizzle-orm';
 import { HTTPException } from 'hono/http-exception';
 import * as z from 'zod';
+import { env } from '~/api/utils/env';
 import { validator } from '~/api/utils/validator';
 import { conflictUpdateAllExcept } from '~/core/database/utils';
 import {
@@ -9,7 +10,12 @@ import {
   UpdateProvider,
   UpdateProviderCredential,
 } from '~/core/schemas/database';
-import { providerCredentialsTable, providerModelsTable, providersTable } from '~/drizzle/schema';
+import { encrypt } from '~/core/utils/encryption';
+import {
+  providerCredentialsTable,
+  providerModelsTable,
+  providersTable,
+} from '~/drizzle/schema';
 import { factory } from '../../utils/factory';
 
 export const providersRoute = factory
@@ -25,7 +31,10 @@ export const providersRoute = factory
     const db = c.get('db');
     const values = c.req.valid('json');
 
-    const [provider] = await db.insert(providersTable).values(values).returning();
+    const [provider] = await db
+      .insert(providersTable)
+      .values(values)
+      .returning();
     if (!provider) {
       throw new HTTPException(500, { message: 'Failed to create provider' });
     }
@@ -54,7 +63,10 @@ export const providersRoute = factory
     const db = c.get('db');
     const id = c.req.param('id');
 
-    const [provider] = await db.select().from(providersTable).where(eq(providersTable.id, id));
+    const [provider] = await db
+      .select()
+      .from(providersTable)
+      .where(eq(providersTable.id, id));
     if (!provider) {
       throw new HTTPException(404, { message: 'Provider not found' });
     }
@@ -82,43 +94,55 @@ export const providersRoute = factory
       return c.json({ data: provider });
     },
   )
-  .delete('/:id', validator('param', z.object({ id: z.string() })), async (c) => {
-    const db = c.get('db');
-    const id = c.req.param('id');
+  .delete(
+    '/:id',
+    validator('param', z.object({ id: z.string() })),
+    async (c) => {
+      const db = c.get('db');
+      const id = c.req.param('id');
 
-    const [provider] = await db
-      .update(providersTable)
-      .set({ deletedAt: new Date() })
-      .where(eq(providersTable.id, id))
-      .returning({ id: providersTable.id });
-    if (!provider) {
-      throw new HTTPException(404, { message: 'Provider not found' });
-    }
+      const [provider] = await db
+        .update(providersTable)
+        .set({ deletedAt: new Date() })
+        .where(eq(providersTable.id, id))
+        .returning({ id: providersTable.id });
+      if (!provider) {
+        throw new HTTPException(404, { message: 'Provider not found' });
+      }
 
-    return c.json({ data: provider.id });
-  })
-  .get('/:id/models', validator('param', z.object({ id: z.string() })), async (c) => {
-    const db = c.get('db');
-    const id = c.req.param('id');
+      return c.json({ data: provider.id });
+    },
+  )
+  .get(
+    '/:id/models',
+    validator('param', z.object({ id: z.string() })),
+    async (c) => {
+      const db = c.get('db');
+      const id = c.req.param('id');
 
-    const models = await db
-      .select()
-      .from(providerModelsTable)
-      .where(eq(providerModelsTable.providerId, id));
+      const models = await db
+        .select()
+        .from(providerModelsTable)
+        .where(eq(providerModelsTable.providerId, id));
 
-    return c.json({ data: models });
-  })
-  .get('/:id/credentials', validator('param', z.object({ id: z.string() })), async (c) => {
-    const db = c.get('db');
-    const id = c.req.param('id');
+      return c.json({ data: models });
+    },
+  )
+  .get(
+    '/:id/credentials',
+    validator('param', z.object({ id: z.string() })),
+    async (c) => {
+      const db = c.get('db');
+      const id = c.req.param('id');
 
-    const { value: _, ...rest } = getTableColumns(providerCredentialsTable);
-    const credentials = await db
-      .select(rest)
-      .from(providerCredentialsTable)
-      .where(eq(providerCredentialsTable.providerId, id));
-    return c.json({ data: credentials });
-  })
+      const { value: _, ...rest } = getTableColumns(providerCredentialsTable);
+      const credentials = await db
+        .select(rest)
+        .from(providerCredentialsTable)
+        .where(eq(providerCredentialsTable.providerId, id));
+      return c.json({ data: credentials });
+    },
+  )
   .post(
     '/:id/credentials',
     validator('json', CreateProviderCredential.omit({ providerId: true })),
@@ -129,10 +153,16 @@ export const providersRoute = factory
 
       const [credential] = await db
         .insert(providerCredentialsTable)
-        .values({ ...values, providerId: id })
+        .values({
+          ...values,
+          value: await encrypt(values.value, env().BETTER_AUTH_SECRET),
+          providerId: id,
+        })
         .returning();
       if (!credential) {
-        throw new HTTPException(500, { message: 'Failed to create credential' });
+        throw new HTTPException(500, {
+          message: 'Failed to create credential',
+        });
       }
 
       return c.json({ data: credential }, 201);

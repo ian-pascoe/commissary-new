@@ -12,7 +12,9 @@ import {
 import { type Context, Resource } from 'alchemy';
 import { AxiosError } from 'axios';
 
-export interface NeonBranchProps extends BranchCreateRequest, AnnotationCreateValueRequest {
+export interface NeonBranchProps
+  extends BranchCreateRequest,
+    AnnotationCreateValueRequest {
   projectId: string;
   adopt?: boolean;
 }
@@ -41,7 +43,10 @@ export const NeonBranch = Resource(
 
     if (this.phase === 'delete') {
       try {
-        await apiClient.deleteProjectBranch(this.output.projectId, this.output.branch.id);
+        await apiClient.deleteProjectBranch(
+          this.output.projectId,
+          this.output.branch.id,
+        );
         return this.destroy();
       } catch (e) {
         throw new Error('Failed to delete project branch', { cause: e });
